@@ -1,0 +1,12 @@
+v
+> g, 01g, 10g,                        v  should print v, >, space
+v                                     <
+> 88*1+70p 70g,                       v  should print A
+v                                     <
+> 88*2+:055*p055*1-p 055*g, 055*1-g,  v  should print space, B
+v                                     <
+> 88*3+:99*0p99*2-0p 99*0g, 99*2-0g,  v  should print space, C
+v                                     <
+> 99*2-64*g, 88*4+ 75*65*9p   #$,     v  should print space, D
+v                                     <
+> 5:+,                                @  print newline, then exit.

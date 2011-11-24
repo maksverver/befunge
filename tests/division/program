@@ -1,0 +1,25 @@
+v  This file checks correctness of division and modulo instructions when applied
+   to negative and zero values.  Expected behaviour is for division to round
+   the result towards zero, and the modulo operator to be consistent with
+   division such that a=(a/b)*b+(a%b).
+> 92/.      v  9/2 should yield 4 (round towards zero)
+v           <
+> 92%.      v  9%2 should give 1 since 9=4*2+1
+v           <
+> 07-3/.    v  -7/3 should give -2 (round towards zero):
+v           <
+> 07-3%.    v  -7%3 should give -1 since -7=-2*3-1
+v           <
+> 703-/.    v  7/-3 should give -2 (same as -7/3)
+v           <
+> 703-%.    v  7%-3 should give 1 since 7=-2*-3+1
+v           <
+> 07-03-/.  v  -7/-3 should give 2 (same as 7/3)
+v           <
+> 07-03-%.  v  -7%-3 should give -1 since -7=2*-3-1
+v           <
+> /.        v  executes 0/0 which should ask for user input
+v           <
+> 7\%.      v  executes 7%0 which should ask for user input too
+v           <
+> 55+,      @  print newline at end
