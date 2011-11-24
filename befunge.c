@@ -32,30 +32,31 @@ static int peek()
 	return sp > 0 ? stack[sp - 1] : 0;
 }
 
-static void pop(size_t cnt, ...)
+static void pop(size_t cnt, int args[])
 {
-	va_list args;
 	size_t n;
 
-	va_start(args, cnt);
 	while (cnt > sp) {
-		*va_arg(args, int*) = 0;
+		*args++ = 0;
 		--cnt;
 	}
 	for (n = cnt; n > 0; --n) {
-		*va_arg(args, int*) = stack[sp - n];
+		*args++ = stack[sp - n];
 	}
 	sp -= cnt;
-	va_end(args);
 }
 
-static void push(int value)
+static void reserve(size_t space)
 {
-	if (sp == stack_size) {	
+	while (stack_size - sp < space) {
 		stack_size = stack_size > 0 ? 2*stack_size : 64;
 		stack = realloc(stack, stack_size*sizeof *stack);
 		if (!stack) fatal("stack reallocation failed");
 	}
+}
+
+static void push(int value)
+{
 	stack[sp++] = value;
 }
 
@@ -130,44 +131,46 @@ static void stringmode()
 
 static void run()
 {
-	int a, b, c;
+	int a[3];  /* arguments; popped from the stack */
+
+	reserve(2);
 	for (;;) {
 		switch (board[y][x]) {
-		case '+': pop(2, &a, &b); push(a + b); break;
-		case '-': pop(2, &a, &b); push(a - b); break;
-		case '*': pop(2, &a, &b); push(a * b); break;
-		case '/': pop(2, &a, &b); push(b ? a/b : read_int()); break;
-		case '%': pop(2, &a, &b); push(b ? a%b : read_int()); break;
-		case '!': pop(1, &a); push(!a); break;
-		case '`': pop(2, &a, &b); push(a > b); break;
+		case '+': pop(2, a); push(a[0] + a[1]); break;
+		case '-': pop(2, a); push(a[0] - a[1]); break;
+		case '*': pop(2, a); push(a[0] * a[1]); break;
+		case '/': pop(2, a); push(a[1] ? a[0]/a[1] : read_int()); break;
+		case '%': pop(2, a); push(a[1] ? a[0]%a[1] : read_int()); break;
+		case '!': pop(1, a); push(!a[0]); break;
+		case '`': pop(2, a); push(a[0] > a[1]); break;
 		case '>': dir = RIGHT; break;
 		case '<': dir = LEFT;break;
 		case '^': dir = UP; break;
 		case 'v': dir = DOWN; break;
 		case '?': dir = rand()/(RAND_MAX/4 + 1); break;
-		case '_': pop(1, &a); dir = a ? LEFT : RIGHT; break;
-		case '|': pop(1, &a); dir = a ? UP : DOWN; break;
+		case '_': pop(1, a); dir = a[0] ? LEFT : RIGHT; break;
+		case '|': pop(1, a); dir = a[0] ? UP : DOWN; break;
 		case '"': stringmode(); break;
-		case ':': push(peek()); break;
-		case '\\': pop(2, &a, &b); push(b); push(a); break;
-		case '$': pop(1, &a); break;
-		case '.': pop(1, &a); printf("%d ", a); break;
-		case ',': pop(1, &a); putchar((char)a); break;
+		case ':': reserve(1); push(peek()); break;
+		case '\\': pop(2, a); push(a[1]); push(a[0]); break;
+		case '$': pop(1, a); break;
+		case '.': pop(1, a); printf("%d ", a[0]); break;
+		case ',': pop(1, a); putchar((char)a[0]); break;
 		case '#': step(); break;
-		case 'g': pop(2, &a, &b); push(get(a, b)); break;
-		case 'p': pop(3, &a, &b, &c); put(a, b, c); break;
-		case '&': push(read_int()); break;
-		case '~': push(read_char()); break;
-		case '0': push(0); break;
-		case '1': push(1); break;
-		case '2': push(2); break;
-		case '3': push(3); break;
-		case '4': push(4); break;
-		case '5': push(5); break;
-		case '6': push(6); break;
-		case '7': push(7); break;
-		case '8': push(8); break;
-		case '9': push(9); break;
+		case 'g': pop(2, a); push(get(a[0], a[1])); break;
+		case 'p': pop(3, a); put(a[0], a[1], a[2]); break;
+		case '&': reserve(1); push(read_int()); break;
+		case '~': reserve(1); push(read_char()); break;
+		case '0': reserve(1); push(0); break;
+		case '1': reserve(1); push(1); break;
+		case '2': reserve(1); push(2); break;
+		case '3': reserve(1); push(3); break;
+		case '4': reserve(1); push(4); break;
+		case '5': reserve(1); push(5); break;
+		case '6': reserve(1); push(6); break;
+		case '7': reserve(1); push(7); break;
+		case '8': reserve(1); push(8); break;
+		case '9': reserve(1); push(9); break;
 		case '@': return;
 		}
 		step();
