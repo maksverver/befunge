@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
+#include <time.h>
+#include <unistd.h>
 
 #define H 25  /* board height */
 #define W 80  /* board width */
@@ -51,32 +52,27 @@ static void pop(size_t cnt, ...)
 static void push(int value)
 {
 	if (sp == stack_size) {	
-		stack_size = stack_size ? 2*stack_size : 64;
+		stack_size = stack_size > 0 ? 2*stack_size : 64;
 		stack = realloc(stack, stack_size*sizeof *stack);
 		if (!stack) fatal("stack reallocation failed");
 	}
 	stack[sp++] = value;
 }
 
-/* COMPAT: does not report failure if the file contains characters outside
-           range of the board, but silently discards them. */
-static bool load_program(const char *path)
+/* COMPAT: silently discards characters outside the board. */
+static void load_program(FILE *fp)
 {
-	FILE *fp = fopen(path, "rt");
 	int x = 0, y = 0;
 	char ch;
 
-	if (fp == NULL) return false;
-	while ((ch = fgetc(fp)) != EOF) {
+	while ((ch = getc(fp)) != EOF) {
 		if (ch == '\n') {
 			x = 0;
-			if (++y == H) break;
+			if (y < H) ++y;
 		} else {
-			if (x < W) board[y][x++] = ch;
+			if (x < W && y < H) board[y][x++] = ch;
 		}
 	}
-	fclose(fp);
-	return true;
 }
 
 static void step()
@@ -89,7 +85,7 @@ static void step()
 	}
 }
 
-static bool in_range(int x, int y)
+static int in_range(int x, int y)
 {
 	return x >= 0 && x < W && y >= 0 && y < H;
 }
@@ -106,6 +102,10 @@ static void put(int v, int x, int y)
 
 static int read_int()
 {
+	/* COMPAT: official specification says we should discard characters
+	           until we find a digit, then read digits until overflow,
+	           but this does not allow negative numbers to be input! */
+	/* COMPAT: aborts rather than reverses direction at EOF */
 	int res;
 	if (scanf("%d", &res) != 1) fatal("failed to read integer");
 	return res;
@@ -113,14 +113,10 @@ static int read_int()
 
 static int read_char()
 {
+	/* COMPAT: aborts rather than reverses direction at EOF */
 	int res = getchar();
-	if (res == EOF) fatal("failed to read integer.\n");
+	if (res == EOF) fatal("EOF while reading character");
 	return res;
-}
-
-static void zero_check(int arg)
-{
-	if (arg == 0) fatal("division by zero");
 }
 
 static void stringmode()
@@ -140,15 +136,15 @@ static void run()
 		case '+': pop(2, &a, &b); push(a + b); break;
 		case '-': pop(2, &a, &b); push(a - b); break;
 		case '*': pop(2, &a, &b); push(a * b); break;
-		case '/': pop(2, &a, &b); zero_check(b); push(a/b); break;
-		case '%': pop(2, &a, &b); zero_check(b); push(a%b); break;
-		case '!': pop(1, &a); push(a); break;
+		case '/': pop(2, &a, &b); push(b ? a/b : read_int()); break;
+		case '%': pop(2, &a, &b); push(b ? a%b : read_int()); break;
+		case '!': pop(1, &a); push(!a); break;
 		case '`': pop(2, &a, &b); push(a > b); break;
 		case '>': dir = RIGHT; break;
 		case '<': dir = LEFT;break;
 		case '^': dir = UP; break;
 		case 'v': dir = DOWN; break;
-		case '?': dir = rand()%4; break;
+		case '?': dir = rand()/(RAND_MAX/4 + 1); break;
 		case '_': pop(1, &a); dir = a ? LEFT : RIGHT; break;
 		case '|': pop(1, &a); dir = a ? UP : DOWN; break;
 		case '"': stringmode(); break;
@@ -172,7 +168,7 @@ static void run()
 		case '7': push(7); break;
 		case '8': push(8); break;
 		case '9': push(9); break;
-		case '@': exit(EXIT_SUCCESS);
+		case '@': return;
 		}
 		step();
 	}
@@ -180,13 +176,20 @@ static void run()
 
 int main(int argc, char *argv[])
 {
-	memset(board, ' ', sizeof(board));
+	srand(time(NULL) + 31337*getpid());  /* seed RNG */
+	memset(board, ' ', sizeof(board));   /* initialize board with spaces */
+	setvbuf(stdout, NULL, _IONBF, 0);    /* make output unbuffered */
 	if (argc != 2) {
 		printf("Usage: befunge <program.bf>\n");
 		return EXIT_SUCCESS;
 	}
-	if (!load_program(argv[1])) {
-		fatal("failed to load program from '%s'", argv[1]);
+	if (strcmp(argv[1], "-") == 0) {
+		load_program(stdin);
+	} else {
+		FILE *fp = fopen(argv[1], "rt");
+		if (!fp) fatal("could not open program file '%s'", argv[1]);
+		load_program(fp);
+		fclose(fp);
 	}
 	run();
 	return EXIT_SUCCESS;
