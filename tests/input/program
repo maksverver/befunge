@@ -1,0 +1,18 @@
+v Test 1: & should skip non-digit characters so reading -123 should yield 123
+  v         ,+55,,,,,,"passed"<
+>    #@& " :1 tseT",,,,,,,, 0`|
+  v         ,+55,,,,,,"failed"<
+
+   Test 2: & should skip non-number characters, so "blargh45" should yield 45
+   v           ,+55,,,,,,"passed"<
+  >  #@& " :2 tseT",,,,,,,, 95*-!|
+   v           ,+55,,,,,,"failed"<
+
+    Test 3: at EOF & should reflect
+   >  #v&$ "deliaf :3 tseT",,,,,,,,,,,,,,55+, v
+       >   "dessap :3 tseT",,,,,,,,,,,,,,55+, v
+    v                                         <
+     Test 4: at EOF ~ should reflect
+    >  #v~$ "deliaf :4 tseT",,,,,,,,,,,,,,55+, v
+        >   "dessap :4 tseT",,,,,,,,,,,,,,55+, v
+                                               @

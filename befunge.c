@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,7 +54,7 @@ static void pop(size_t cnt, int args[])
 }
 
 /* Reserves space for `required' additional items on the stack.  The stack is
-   reallocated if necessary. A fatal error occurs if allocation fails. */
+   reallocated if necessary.  A fatal error occurs if allocation fails. */
 static void reserve(size_t required)
 {
 	required += sp;
@@ -125,23 +127,41 @@ static void put(int v, int x, int y)
 	if (in_range(x, y)) board[y][x] = (char)v;
 }
 
-static int read_int()
+/* Reverses the direction of the instruction pointer. */
+static void reflect()
 {
-	/* COMPAT: official specification says we should discard characters
-	           until we find a digit, then read digits until overflow,
-	           but this does not allow negative numbers to be input! */
-	/* COMPAT: aborts rather than reverses direction at EOF */
-	int res;
-	if (scanf("%d", &res) != 1) fatal("failed to read integer");
-	return res;
+	dir ^= 2;
 }
 
-static int read_char()
+/* Executes the readint command: discards characters until reading a digit, then
+   reads digits until overflow/EOF, and pushes the result.  If no digits occur
+   before EOF, it reflects instead. */
+static void readint()
 {
-	/* COMPAT: aborts rather than reverses direction at EOF */
-	int res = getchar();
-	if (res == EOF) fatal("EOF while reading character");
-	return res;
+	char ch;
+	int i;
+
+	while (!isdigit(ch = getc(stdin))) {
+		if (ch == EOF) {
+			reflect();
+			return;
+		}
+	}
+	i = ch - '0';
+	while (isdigit(ch = getc(stdin))) {
+		if (INT_MAX/i < 10 || INT_MAX - 10*i < (ch - '0')) break;
+		i = 10*i + (ch - '0');
+	}
+	if (ch != EOF) ungetc(ch, stdin);
+	push(i);
+}
+
+/* Executes the readchar command: reads a character and pushes it, or reflects
+   instead if no character can be read. */
+static void readchar()
+{
+	int ch = getc(stdin);
+	if (ch != EOF) push(ch); else reflect();
 }
 
 /* Executes stringmode: steps over the board until a double-quote character is
@@ -166,8 +186,10 @@ static void run()
 		case '+': pop(2, a); push_bare(a[0] + a[1]); break;
 		case '-': pop(2, a); push_bare(a[0] - a[1]); break;
 		case '*': pop(2, a); push_bare(a[0] * a[1]); break;
-		case '/': pop(2, a); push_bare(a[1] ? a[0]/a[1] : read_int()); break;
-		case '%': pop(2, a); push_bare(a[1] ? a[0]%a[1] : read_int()); break;
+		case '/': pop(2, a); if (a[1]) push_bare(a[0]/a[1]);
+		                     else readint(); break;
+		case '%': pop(2, a); if (a[1]) push_bare(a[0]%a[1]); 
+		                     else readint(); break;
 		case '!': pop(1, a); push_bare(!a[0]); break;
 		case '`': pop(2, a); push_bare(a[0] > a[1]); break;
 		case '>': dir = RIGHT; break;
@@ -186,8 +208,8 @@ static void run()
 		case '#': step(); break;
 		case 'g': pop(2, a); push_bare(get(a[0], a[1])); break;
 		case 'p': pop(3, a); put(a[0], a[1], a[2]); break;
-		case '&': push(read_int()); break;
-		case '~': push(read_char()); break;
+		case '&': readint(); break;
+		case '~': readchar(); break;
 		case '0': push(0); break;
 		case '1': push(1); break;
 		case '2': push(2); break;
