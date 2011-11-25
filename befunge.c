@@ -15,6 +15,7 @@ static signed int *stack;
 static size_t sp, stack_size;
 static int x, y, dir;
 
+/* Prints a fatal error message and then exits the program. */
 static void fatal(const char *fmt, ...)
 {
 	va_list args;
@@ -27,11 +28,15 @@ static void fatal(const char *fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
+/* Returns the value on top of stack (or 0) but does not remove it. */
 static int peek()
 {
 	return sp > 0 ? stack[sp - 1] : 0;
 }
 
+/* Pops the top `cnt' elements off the stack and assigns them to `args'.
+   The bottommost value is assigned to arg[0], et cetera.  If the stack
+   contains fewer than `cnt' items, the first few elements are set to 0. */
 static void pop(size_t cnt, int args[])
 {
 	size_t n;
@@ -46,21 +51,36 @@ static void pop(size_t cnt, int args[])
 	sp -= cnt;
 }
 
-static void reserve(size_t space)
+/* Reserves space for `required' additional items on the stack.  The stack is
+   reallocated if necessary. A fatal error occurs if allocation fails. */
+static void reserve(size_t required)
 {
-	while (stack_size - sp < space) {
-		stack_size = stack_size > 0 ? 2*stack_size : 64;
+	required += sp;
+	if (stack_size < required) {
+		stack_size += stack_size;
+		if (stack_size < required) stack_size = required;
 		stack = realloc(stack, stack_size*sizeof *stack);
 		if (!stack) fatal("stack reallocation failed");
 	}
 }
 
-static void push(int value)
+/* Pushes a value on the stack WITHOUT reserve space first.  This UNSAFE unless
+   it is known that there is free space in the stack array (for example,
+   immediately after some values have been popped).  */
+static void push_bare(int value)
 {
 	stack[sp++] = value;
 }
 
-/* COMPAT: silently discards characters outside the board. */
+/* Pushes a value on the stack. */
+static void push(int value)
+{
+	reserve(1);
+	push_bare(value);
+}
+
+/* Loads a program from a file onto the board.
+   COMPAT: silently discards characters outside the board. */
 static void load_program(FILE *fp)
 {
 	int x = 0, y = 0;
@@ -76,6 +96,7 @@ static void load_program(FILE *fp)
 	}
 }
 
+/* Moves the instruction pointer by one step. */
 static void step()
 {
 	switch (dir) {
@@ -86,16 +107,19 @@ static void step()
 	}
 }
 
+/* Returns whether the given coordinates are in range of the board. */
 static int in_range(int x, int y)
 {
 	return x >= 0 && x < W && y >= 0 && y < H;
 }
 
+/* Returns value on the board at (x,y) (or space if not in range). */
 static int get(int x, int y)
 {
 	return in_range(x, y) ? board[y][x] : ' ';
 }
 
+/* Writes `v' to the board at (x,y) if in range. */
 static void put(int v, int x, int y)
 {
 	if (in_range(x, y)) board[y][x] = (char)v;
@@ -120,6 +144,8 @@ static int read_char()
 	return res;
 }
 
+/* Executes stringmode: steps over the board until a double-quote character is
+   found, pushing all visited characters onto the stack in the process. */
 static void stringmode()
 {
 	step();
@@ -129,20 +155,21 @@ static void stringmode()
 	}
 }
 
+/* Executes the main interpreter loop. */
 static void run()
 {
 	int a[3];  /* arguments; popped from the stack */
 
-	reserve(2);
+	reserve(64);  /* MUST reserve some stack space (at least 2 items) */
 	for (;;) {
 		switch (board[y][x]) {
-		case '+': pop(2, a); push(a[0] + a[1]); break;
-		case '-': pop(2, a); push(a[0] - a[1]); break;
-		case '*': pop(2, a); push(a[0] * a[1]); break;
-		case '/': pop(2, a); push(a[1] ? a[0]/a[1] : read_int()); break;
-		case '%': pop(2, a); push(a[1] ? a[0]%a[1] : read_int()); break;
-		case '!': pop(1, a); push(!a[0]); break;
-		case '`': pop(2, a); push(a[0] > a[1]); break;
+		case '+': pop(2, a); push_bare(a[0] + a[1]); break;
+		case '-': pop(2, a); push_bare(a[0] - a[1]); break;
+		case '*': pop(2, a); push_bare(a[0] * a[1]); break;
+		case '/': pop(2, a); push_bare(a[1] ? a[0]/a[1] : read_int()); break;
+		case '%': pop(2, a); push_bare(a[1] ? a[0]%a[1] : read_int()); break;
+		case '!': pop(1, a); push_bare(!a[0]); break;
+		case '`': pop(2, a); push_bare(a[0] > a[1]); break;
 		case '>': dir = RIGHT; break;
 		case '<': dir = LEFT;break;
 		case '^': dir = UP; break;
@@ -151,32 +178,33 @@ static void run()
 		case '_': pop(1, a); dir = a[0] ? LEFT : RIGHT; break;
 		case '|': pop(1, a); dir = a[0] ? UP : DOWN; break;
 		case '"': stringmode(); break;
-		case ':': reserve(1); push(peek()); break;
-		case '\\': pop(2, a); push(a[1]); push(a[0]); break;
+		case ':': push(peek()); break;
+		case '\\': pop(2, a); push_bare(a[1]); push_bare(a[0]); break;
 		case '$': pop(1, a); break;
 		case '.': pop(1, a); printf("%d ", a[0]); break;
 		case ',': pop(1, a); putchar((char)a[0]); break;
 		case '#': step(); break;
-		case 'g': pop(2, a); push(get(a[0], a[1])); break;
+		case 'g': pop(2, a); push_bare(get(a[0], a[1])); break;
 		case 'p': pop(3, a); put(a[0], a[1], a[2]); break;
-		case '&': reserve(1); push(read_int()); break;
-		case '~': reserve(1); push(read_char()); break;
-		case '0': reserve(1); push(0); break;
-		case '1': reserve(1); push(1); break;
-		case '2': reserve(1); push(2); break;
-		case '3': reserve(1); push(3); break;
-		case '4': reserve(1); push(4); break;
-		case '5': reserve(1); push(5); break;
-		case '6': reserve(1); push(6); break;
-		case '7': reserve(1); push(7); break;
-		case '8': reserve(1); push(8); break;
-		case '9': reserve(1); push(9); break;
+		case '&': push(read_int()); break;
+		case '~': push(read_char()); break;
+		case '0': push(0); break;
+		case '1': push(1); break;
+		case '2': push(2); break;
+		case '3': push(3); break;
+		case '4': push(4); break;
+		case '5': push(5); break;
+		case '6': push(6); break;
+		case '7': push(7); break;
+		case '8': push(8); break;
+		case '9': push(9); break;
 		case '@': return;
 		}
 		step();
 	}
 }
 
+/* Application entry point. */
 int main(int argc, char *argv[])
 {
 	srand(time(NULL) + 31337*getpid());  /* seed RNG */
