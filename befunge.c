@@ -36,21 +36,27 @@ static int peek()
 	return sp > 0 ? stack[sp - 1] : 0;
 }
 
-/* Pops the top `cnt' elements off the stack and assigns them to `args'.
-   The bottommost value is assigned to arg[0], et cetera.  If the stack
-   contains fewer than `cnt' items, the first few elements are set to 0. */
-static void pop(size_t cnt, int args[])
-{
-	size_t n;
+/* The following three functions pop one, two or three items off the stack and
+   assign them to the values pointed to by the arguments from right to left.
+   If the stack does not contain enough values, then zeros are assigned to the
+   remaining arguments.
 
-	while (cnt > sp) {
-		*args++ = 0;
-		--cnt;
-	}
-	for (n = cnt; n > 0; --n) {
-		*args++ = stack[sp - n];
-	}
-	sp -= cnt;
+   The definitions of pop2() and pop3() may look redundant, but are written to
+   take advantage of inlining compiler optimizations. */
+
+static void pop1(int *a)
+{
+	if (sp >= 1) *a = stack[--sp]; else *a = 0;
+}
+
+static void pop2(int *a, int *b)
+{
+	if (sp >= 2) pop1(b), *a = stack[--sp]; else pop1(b), *a = 0;
+}
+
+static void pop3(int *a, int *b, int *c)
+{
+	if (sp >= 3) pop2(b, c), *a = stack[--sp]; else pop2(b, c), *a = 0;
 }
 
 /* Reserves space for `required' additional items on the stack.  The stack is
@@ -74,7 +80,7 @@ static void push_bare(int value)
 	stack[sp++] = value;
 }
 
-/* Pushes a value on the stack. */
+/* Pushes a value onto the stack. */
 static void push(int value)
 {
 	reserve(1);
@@ -178,36 +184,36 @@ static void stringmode()
 /* Executes the main interpreter loop. */
 static void run()
 {
-	int a[3];  /* arguments; popped from the stack */
-
 	reserve(64);  /* MUST reserve some stack space (at least 2 items) */
 	for (;;) {
+		int a, b, c;  /* arguments; popped from the stack */
+
 		switch (board[y][x]) {
-		case '+': pop(2, a); push_bare(a[0] + a[1]); break;
-		case '-': pop(2, a); push_bare(a[0] - a[1]); break;
-		case '*': pop(2, a); push_bare(a[0] * a[1]); break;
-		case '/': pop(2, a); if (a[1]) push_bare(a[0]/a[1]);
-		                     else readint(); break;
-		case '%': pop(2, a); if (a[1]) push_bare(a[0]%a[1]); 
-		                     else readint(); break;
-		case '!': pop(1, a); push_bare(!a[0]); break;
-		case '`': pop(2, a); push_bare(a[0] > a[1]); break;
+		case '+': pop2(&a, &b); push_bare(a + b); break;
+		case '-': pop2(&a, &b); push_bare(a - b); break;
+		case '*': pop2(&a, &b); push_bare(a * b); break;
+		case '/': pop2(&a, &b);
+		          if (b) push_bare(a/b); else readint(); break;
+		case '%': pop2(&a, &b);
+		          if (b) push_bare(a%b); else readint(); break;
+		case '!': pop1(&a); push_bare(!a); break;
+		case '`': pop2(&a, &b); push_bare(a > b); break;
 		case '>': dir = RIGHT; break;
 		case '<': dir = LEFT;break;
 		case '^': dir = UP; break;
 		case 'v': dir = DOWN; break;
 		case '?': dir = rand()/(RAND_MAX/4 + 1); break;
-		case '_': pop(1, a); dir = a[0] ? LEFT : RIGHT; break;
-		case '|': pop(1, a); dir = a[0] ? UP : DOWN; break;
+		case '_': pop1(&a); dir = a ? LEFT : RIGHT; break;
+		case '|': pop1(&a); dir = a ? UP : DOWN; break;
 		case '"': stringmode(); break;
 		case ':': push(peek()); break;
-		case '\\': pop(2, a); push_bare(a[1]); push_bare(a[0]); break;
-		case '$': pop(1, a); break;
-		case '.': pop(1, a); printf("%d ", a[0]); break;
-		case ',': pop(1, a); putchar((char)a[0]); break;
+		case '\\': pop2(&a, &b); push_bare(b); push_bare(a); break;
+		case '$': pop1(&a); break;
+		case '.': pop1(&a); printf("%d ", a); break;
+		case ',': pop1(&a); putchar((char)a); break;
 		case '#': step(); break;
-		case 'g': pop(2, a); push_bare(get(a[0], a[1])); break;
-		case 'p': pop(3, a); put(a[0], a[1], a[2]); break;
+		case 'g': pop2(&a, &b); push_bare(get(a, b)); break;
+		case 'p': pop3(&a, &b, &c); put(a, b, c); break;
 		case '&': readint(); break;
 		case '~': readchar(); break;
 		case '0': push(0); break;
