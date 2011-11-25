@@ -1,0 +1,9 @@
+& v_ v_ $.55+,@
+  1: +:
+  \  \
+  1- >^
+  >^
+
+Reads a number, pushes that many 1s onto the stack, then adds all the numbers
+back together and prints the result (which should be equal to the original
+number).  Useful to test if big stacks work.  Also useful as a benchmark.
