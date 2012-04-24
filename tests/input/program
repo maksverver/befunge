@@ -8,11 +8,16 @@ v Test 1: & should skip non-digit characters so reading -123 should yield 123
   >  #@& " :2 tseT",,,,,,,, 95*-!|
    v           ,+55,,,,,,"failed"<
 
-    Test 3: at EOF & should reflect
-   >  #v&$ "deliaf :3 tseT",,,,,,,,,,,,,,55+, v
-       >   "dessap :3 tseT",,,,,,,,,,,,,,55+, v
-    v                                         <
-     Test 4: at EOF ~ should reflect
-    >  #v~$ "deliaf :4 tseT",,,,,,,,,,,,,,55+, v
+    Test 3: ~ should read newline (last & should not have discarded it)
+    v           ,+55,,,,,,"passed"<
+   >  #@~ " :3 tseT",,,,,,,, 55+-!|
+    v           ,+55,,,,,,"failed"<
+
+     Test 4: at EOF & should reflect
+    >  #v&$ "deliaf :4 tseT",,,,,,,,,,,,,,55+, v
         >   "dessap :4 tseT",,,,,,,,,,,,,,55+, v
-                                               @
+     v                                         <
+      Test 5: at EOF ~ should reflect
+     >  #v~$ "deliaf :5 tseT",,,,,,,,,,,,,,55+, v
+         >   "dessap :5 tseT",,,,,,,,,,,,,,55+, v
+                                                @
